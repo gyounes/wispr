@@ -1,4 +1,3 @@
-
 package main
 
 import (
@@ -6,7 +5,8 @@ import (
     "net"
 
     "google.golang.org/grpc"
-    "github.com/gyounes/wispr/backend/proto"
+    pb "github.com/gyounes/wispr/backend/proto"
+    "github.com/gyounes/wispr/backend/server"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
     }
 
     s := grpc.NewServer()
-    proto.RegisterChatServiceServer(s, &Server{})
+    pb.RegisterChatServiceServer(s, server.NewServer())
 
     log.Println("gRPC server running on :50051")
     if err := s.Serve(lis); err != nil {
