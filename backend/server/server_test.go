@@ -1,70 +1,45 @@
 package server
 
 import (
-    "context"
-    "testing"
-    "time"
-
-    pb "github.com/gyounes/wispr/backend/proto"
+	"context"
+	"testing"
 )
 
-func TestSendMessage(t *testing.T) {
-    s := NewServer()
+func TestConnections(t *testing.T) {
+	conn := NewConnections()
+	ch := make(chan *Message, 1)
+	conn.Add("Alice", ch)
 
-    // Create fake client channel
-    s.clients["Bob"] = make(chan *pb.Message, 1)
+	if _, ok := conn.Get("Alice"); !ok {
+		t.Fatal("Alice should exist")
+	}
 
-    msg := &pb.Message{
-        Sender:    "Alice",
-        Recipient: "Bob",
-        Content:   "Hello Bob!",
-        Timestamp: time.Now().Format(time.RFC3339),
-    }
-
-    ack, err := s.SendMessage(context.Background(), msg) // ✅ add context
-    if err != nil {
-        t.Fatalf("SendMessage error: %v", err)
-    }
-    if !ack.Success {
-        t.Fatalf("SendMessage failed")
-    }
-
-    // Check if Bob received the message
-    select {
-    case m := <-s.clients["Bob"]:
-        if m.Content != "Hello Bob!" {
-            t.Fatalf("Expected 'Hello Bob!', got '%s'", m.Content)
-        }
-    case <-time.After(time.Second):
-        t.Fatalf("Message not received by Bob")
-    }
+	conn.Remove("Alice")
+	if _, ok := conn.Get("Alice"); ok {
+		t.Fatal("Alice should have been removed")
+	}
 }
 
-func TestReceiveMessages(t *testing.T) {
-    s := NewServer()
+func TestSendAndReceiveMessage(t *testing.T) {
+	s := NewServer()
+	ch := make(chan *Message, 1)
+	s.connections.Add("Bob", ch)
 
-    // fake stream
-    msgs := make(chan *pb.Message, 1)
-    s.clients["Alice"] = msgs
+	msg := NewMessage("Alice", "Bob", "Hello Bob!")
+	ack, err := s.SendMessage(context.Background(), msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ack.Success {
+		t.Fatal("SendMessage failed")
+	}
 
-    msg := &pb.Message{
-        Sender:    "Bob",
-        Recipient: "Alice",
-        Content:   "Hi Alice!",
-        Timestamp: time.Now().Format(time.RFC3339),
-    }
-
-    _, err := s.SendMessage(context.Background(), msg) // ✅ add context
-    if err != nil {
-        t.Fatalf("SendMessage error: %v", err)
-    }
-
-    select {
-    case m := <-msgs:
-        if m.Content != "Hi Alice!" {
-            t.Fatalf("Expected 'Hi Alice!', got '%s'", m.Content)
-        }
-    case <-time.After(time.Second):
-        t.Fatalf("Message not received")
-    }
+	select {
+	case m := <-ch:
+		if m.Content != "Hello Bob!" {
+			t.Fatalf("Expected 'Hello Bob!', got '%s'", m.Content)
+		}
+	default:
+		t.Fatal("Message not received by Bob")
+	}
 }

@@ -1,59 +1,41 @@
 package server
 
 import (
-    "context"
-    "sync"
+	"context"
 
-    pb "github.com/gyounes/wispr/backend/proto"
+	pb "github.com/gyounes/wispr/backend/proto"
 )
 
 type Server struct {
-    pb.UnimplementedChatServiceServer
-    mu      sync.Mutex
-    clients map[string]chan *pb.Message
+	pb.UnimplementedChatServiceServer
+	connections *Connections
 }
 
 func NewServer() *Server {
-    return &Server{
-        clients: make(map[string]chan *pb.Message),
-    }
+	return &Server{
+		connections: NewConnections(),
+	}
 }
 
-// Fixed: added context.Context as the first parameter
+// SendMessage sends message to recipient
 func (s *Server) SendMessage(ctx context.Context, msg *pb.Message) (*pb.Ack, error) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-
-    // Broadcast to recipient if connected
-    if ch, ok := s.clients[msg.Recipient]; ok {
-        ch <- msg
-    }
-
-    return &pb.Ack{Success: true}, nil
+	s.connections.Broadcast(msg)
+	return NewAck(true), nil
 }
 
-// Streaming RPC stays the same
+// ReceiveMessages streams messages for a client
 func (s *Server) ReceiveMessages(msg *pb.Message, stream pb.ChatService_ReceiveMessagesServer) error {
-    ch := make(chan *pb.Message, 10)
+	ch := make(chan *pb.Message, 10)
+	s.connections.Add(msg.Sender, ch)
+	defer func() {
+		s.connections.Remove(msg.Sender)
+		close(ch)
+	}()
 
-    s.mu.Lock()
-    s.clients[msg.Sender] = ch
-    s.mu.Unlock()
-
-    // Clean up when function exits
-    defer func() {
-        s.mu.Lock()
-        delete(s.clients, msg.Sender)
-        s.mu.Unlock()
-        close(ch)
-    }()
-
-    // Stream messages as they arrive
-    for m := range ch {
-        if err := stream.Send(m); err != nil {
-            return err
-        }
-    }
-
-    return nil
+	for m := range ch {
+		if err := stream.Send(m); err != nil {
+			return err
+		}
+	}
+	return nil
 }
