@@ -1,17 +1,16 @@
-// backend/server/server.go
 package server
 
 import (
+    "context"
     "sync"
-    "time"
 
     pb "github.com/gyounes/wispr/backend/proto"
 )
 
 type Server struct {
     pb.UnimplementedChatServiceServer
-    mu       sync.Mutex
-    clients  map[string]chan *pb.Message
+    mu      sync.Mutex
+    clients map[string]chan *pb.Message
 }
 
 func NewServer() *Server {
@@ -20,7 +19,8 @@ func NewServer() *Server {
     }
 }
 
-func (s *Server) SendMessage(msg *pb.Message) (*pb.Ack, error) {
+// Fixed: added context.Context as the first parameter
+func (s *Server) SendMessage(ctx context.Context, msg *pb.Message) (*pb.Ack, error) {
     s.mu.Lock()
     defer s.mu.Unlock()
 
@@ -32,6 +32,7 @@ func (s *Server) SendMessage(msg *pb.Message) (*pb.Ack, error) {
     return &pb.Ack{Success: true}, nil
 }
 
+// Streaming RPC stays the same
 func (s *Server) ReceiveMessages(msg *pb.Message, stream pb.ChatService_ReceiveMessagesServer) error {
     ch := make(chan *pb.Message, 10)
 
