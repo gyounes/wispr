@@ -8,27 +8,27 @@ import (
 
 type Server struct {
 	pb.UnimplementedChatServiceServer
-	connections *Connections
+	Connections *Connections
 }
 
 func NewServer() *Server {
 	return &Server{
-		connections: NewConnections(),
+		Connections: NewConnections(),
 	}
 }
 
 // SendMessage sends message to recipient
 func (s *Server) SendMessage(ctx context.Context, msg *pb.Message) (*pb.Ack, error) {
-	s.connections.Broadcast(msg)
+	s.Connections.Broadcast(msg)
 	return NewAck(true), nil
 }
 
 // ReceiveMessages streams messages for a client
 func (s *Server) ReceiveMessages(msg *pb.Message, stream pb.ChatService_ReceiveMessagesServer) error {
 	ch := make(chan *pb.Message, 10)
-	s.connections.Add(msg.Sender, ch)
+	s.Connections.Add(msg.Sender, ch)
 	defer func() {
-		s.connections.Remove(msg.Sender)
+		s.Connections.Remove(msg.Sender)
 		close(ch)
 	}()
 
