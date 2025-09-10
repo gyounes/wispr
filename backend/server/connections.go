@@ -1,10 +1,17 @@
 package server
 
-import "sync"
+import (
+	"sync"
+	"time"
+
+	pb "github.com/gyounes/wispr/backend/proto"
+	"github.com/gyounes/wispr/backend/storage"
+)
 
 type Connections struct {
 	mu      sync.Mutex
 	clients map[string]chan *Message
+	Storage *storage.Storage
 }
 
 func NewConnections() *Connections {
@@ -42,10 +49,18 @@ func (c *Connections) List() []string {
 	return users
 }
 
-func (c *Connections) Broadcast(msg *Message) {
+func (c *Connections) Broadcast(msg *pb.Message) {
+	// save to DB
+	if c.Storage != nil {
+		timestamp, _ := time.Parse(time.RFC3339, msg.Timestamp)
+		_ = c.Storage.SaveMessage(msg.Sender, msg.Recipient, msg.Content, timestamp)
+	}
+
+	// send to recipient channel
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	if ch, ok := c.clients[msg.Recipient]; ok {
+	ch, ok := c.clients[msg.Recipient]
+	c.mu.Unlock()
+	if ok {
 		ch <- msg
 	}
 }

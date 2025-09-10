@@ -4,11 +4,13 @@ import (
 	"context"
 
 	pb "github.com/gyounes/wispr/backend/proto"
+	"github.com/gyounes/wispr/backend/storage"
 )
 
 type Server struct {
 	pb.UnimplementedChatServiceServer
 	Connections *Connections
+	Storage     *storage.Storage
 }
 
 func NewServer() *Server {

@@ -9,16 +9,24 @@ import (
 
 	pb "github.com/gyounes/wispr/backend/proto"
 	"github.com/gyounes/wispr/backend/server"
+	"github.com/gyounes/wispr/backend/storage"
 	"github.com/gyounes/wispr/backend/transport"
 )
 
 func main() {
-	// Shared connection manager
+	// Initialize persistent storage (SQLite)
+	db := storage.New("wispr.db")
+
+	// Shared connection manager with Storage
 	connections := server.NewConnections()
+	connections.Storage = db
 
 	// Start gRPC server
 	grpcServer := grpc.NewServer()
-	pb.RegisterChatServiceServer(grpcServer, &server.Server{Connections: connections})
+	pb.RegisterChatServiceServer(grpcServer, &server.Server{
+		Connections: connections,
+		Storage:     db,
+	})
 
 	go func() {
 		lis, err := net.Listen("tcp", ":50051")

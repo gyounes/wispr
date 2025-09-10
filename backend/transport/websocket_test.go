@@ -62,6 +62,6 @@ func TestWebSocketBroadcast(t *testing.T) {
 	}
 
 	if received.Content != "Hello Bob!" || received.Sender != "Alice" {
-		t.Fatalf("Unexpected message received: %+v", received)
+		t.Fatalf("Unexpected message received: Sender=%s, Recipient=%s, Content=%s, Timestamp=%s", received.Sender, received.Recipient, received.Content, received.Timestamp)
 	}
 }

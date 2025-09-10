@@ -23,7 +23,7 @@ func TestConnections(t *testing.T) {
 func TestSendAndReceiveMessage(t *testing.T) {
 	s := NewServer()
 	ch := make(chan *Message, 1)
-	s.connections.Add("Bob", ch)
+	s.Connections.Add("Bob", ch)
 
 	msg := NewMessage("Alice", "Bob", "Hello Bob!")
 	ack, err := s.SendMessage(context.Background(), msg)

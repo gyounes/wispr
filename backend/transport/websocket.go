@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 	pb "github.com/gyounes/wispr/backend/proto"
@@ -45,6 +46,19 @@ func (wss *WebSocketServer) HandleWS(w http.ResponseWriter, r *http.Request) {
 	ch := make(chan *pb.Message, 10)
 	wss.connections.Add(username, ch)
 	defer wss.connections.Remove(username)
+
+	// Send last 50 messages from DB
+	if wss.connections.Storage != nil {
+		lastMsgs, _ := wss.connections.Storage.GetLastMessages(username, 50)
+		for _, m := range lastMsgs {
+			ch <- &pb.Message{
+				Sender:    m.Sender,
+				Recipient: m.Recipient,
+				Content:   m.Content,
+				Timestamp: m.Timestamp.Format(time.RFC3339),
+			}
+		}
+	}
 
 	// Writer goroutine (send messages to WebSocket)
 	go func() {
