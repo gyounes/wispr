@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"testing"
+
+	"github.com/gyounes/wispr/backend/storage"
 )
 
 func TestConnections(t *testing.T) {
@@ -20,8 +22,14 @@ func TestConnections(t *testing.T) {
 	}
 }
 
-func TestSendAndReceiveMessage(t *testing.T) {
+func TestSendAndReceiveMessageWithDB(t *testing.T) {
+	// in-memory DB
+	db := storage.New(":memory:")
+
 	s := NewServer()
+	s.Connections.Storage = db
+	s.Storage = db
+
 	ch := make(chan *Message, 1)
 	s.Connections.Add("Bob", ch)
 
@@ -34,6 +42,7 @@ func TestSendAndReceiveMessage(t *testing.T) {
 		t.Fatal("SendMessage failed")
 	}
 
+	// Check channel delivery
 	select {
 	case m := <-ch:
 		if m.Content != "Hello Bob!" {
@@ -41,5 +50,17 @@ func TestSendAndReceiveMessage(t *testing.T) {
 		}
 	default:
 		t.Fatal("Message not received by Bob")
+	}
+
+	// Check DB persistence
+	msgs, err := db.GetLastMessages("Bob", 10)
+	if err != nil {
+		t.Fatalf("DB GetLastMessages failed: %v", err)
+	}
+	if len(msgs) == 0 {
+		t.Fatal("No messages saved in DB")
+	}
+	if msgs[0].Content != "Hello Bob!" || msgs[0].Sender != "Alice" {
+		t.Fatalf("Unexpected DB message: %+v", msgs[0])
 	}
 }

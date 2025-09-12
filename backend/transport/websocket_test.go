@@ -10,6 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	pb "github.com/gyounes/wispr/backend/proto"
 	"github.com/gyounes/wispr/backend/server"
+	"github.com/gyounes/wispr/backend/storage"
 )
 
 // Helper: dial test WebSocket server
@@ -22,8 +23,12 @@ func dialWS(tsURL, username string, t *testing.T) *websocket.Conn {
 	return c
 }
 
-func TestWebSocketBroadcast(t *testing.T) {
+func TestWebSocketBroadcastWithDB(t *testing.T) {
+	// in-memory DB
+	db := storage.New(":memory:")
+
 	connections := server.NewConnections()
+	connections.Storage = db
 	wss := NewWebSocketServer(connections)
 
 	// Start test HTTP server
@@ -62,6 +67,15 @@ func TestWebSocketBroadcast(t *testing.T) {
 	}
 
 	if received.Content != "Hello Bob!" || received.Sender != "Alice" {
-		t.Fatalf("Unexpected message received: Sender=%s, Recipient=%s, Content=%s, Timestamp=%s", received.Sender, received.Recipient, received.Content, received.Timestamp)
+		t.Fatalf("Unexpected message received: %+v", received)
+	}
+
+	// Check DB persistence
+	msgs, err := db.GetLastMessages("Bob", 10)
+	if err != nil {
+		t.Fatalf("DB GetLastMessages failed: %v", err)
+	}
+	if len(msgs) == 0 || msgs[0].Content != "Hello Bob!" {
+		t.Fatal("Message not saved in DB")
 	}
 }
