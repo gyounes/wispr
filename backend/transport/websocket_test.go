@@ -27,6 +27,11 @@ func TestWebSocketBroadcastWithDB(t *testing.T) {
 	// in-memory DB
 	db := storage.New(":memory:")
 
+	// Ensure schema is ready before starting server
+	if err := db.DB.AutoMigrate(&storage.Message{}); err != nil {
+		t.Fatalf("DB migration failed: %v", err)
+	}
+
 	connections := server.NewConnections()
 	connections.Storage = db
 	wss := NewWebSocketServer(connections)
