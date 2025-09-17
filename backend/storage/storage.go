@@ -1,14 +1,18 @@
 package storage
 
 import (
+	"fmt"
 	"log"
 	"time"
 
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-// Message represents a chat message in the DB
+type Storage struct {
+	db *gorm.DB
+}
+
 type Message struct {
 	ID        uint `gorm:"primaryKey"`
 	Sender    string
@@ -17,53 +21,40 @@ type Message struct {
 	Timestamp time.Time
 }
 
-// Storage wraps the DB connection
-type Storage struct {
-	DB *gorm.DB
-}
+// NewStorage initializes a Postgres-backed DB
+func NewStorage(user, password, dbname, host string, port int) *Storage {
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=UTC",
+		host, user, password, dbname, port,
+	)
 
-// New initializes the DB (SQLite)
-func New(dbPath string) *Storage {
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("failed to connect to DB: %v", err)
+		log.Fatalf("failed to connect database: %v", err)
 	}
 
-	// Migrate the schema
+	// AutoMigrate creates the messages table if it doesn’t exist
 	if err := db.AutoMigrate(&Message{}); err != nil {
-		log.Fatalf("failed to migrate DB: %v", err)
+		log.Fatalf("failed to migrate: %v", err)
 	}
 
-	return &Storage{DB: db}
+	return &Storage{db: db}
 }
 
-// SaveMessage persists a message
 func (s *Storage) SaveMessage(sender, recipient, content string, timestamp time.Time) error {
-	msg := &Message{
+	return s.db.Create(&Message{
 		Sender:    sender,
 		Recipient: recipient,
 		Content:   content,
 		Timestamp: timestamp,
-	}
-	return s.DB.Create(msg).Error
+	}).Error
 }
 
-// GetLastMessages retrieves last N messages (for a user)
-func (s *Storage) GetLastMessages(username string, limit int) ([]Message, error) {
-	var messages []Message
-	err := s.DB.
-		Where("sender = ? OR recipient = ?", username, username).
+func (s *Storage) GetLastMessages(user string, limit int) ([]Message, error) {
+	var msgs []Message
+	err := s.db.Where("sender = ? OR recipient = ?", user, user).
 		Order("timestamp desc").
 		Limit(limit).
-		Find(&messages).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// reverse so oldest first
-	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
-		messages[i], messages[j] = messages[j], messages[i]
-	}
-
-	return messages, nil
+		Find(&msgs).Error
+	return msgs, err
 }

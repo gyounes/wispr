@@ -14,19 +14,16 @@ import (
 )
 
 func main() {
-	// Initialize persistent storage (SQLite)
-	db := storage.New("wispr.db")
+	// Connect to Postgres (running in Docker)
+	store := storage.NewStorage("postgres", "secret", "wispr_dev", "localhost", 5432)
 
-	// Shared connection manager with Storage
+	// Shared connection manager with DB
 	connections := server.NewConnections()
-	connections.Storage = db
+	connections.Storage = store
 
 	// Start gRPC server
 	grpcServer := grpc.NewServer()
-	pb.RegisterChatServiceServer(grpcServer, &server.Server{
-		Connections: connections,
-		Storage:     db,
-	})
+	pb.RegisterChatServiceServer(grpcServer, &server.Server{Connections: connections})
 
 	go func() {
 		lis, err := net.Listen("tcp", ":50051")
