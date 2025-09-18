@@ -10,7 +10,7 @@ import (
 )
 
 type Storage struct {
-	db *gorm.DB
+	DB *gorm.DB
 }
 
 type Message struct {
@@ -38,11 +38,11 @@ func NewStorage(user, password, dbname, host string, port int) *Storage {
 		log.Fatalf("failed to migrate: %v", err)
 	}
 
-	return &Storage{db: db}
+	return &Storage{DB: db}
 }
 
 func (s *Storage) SaveMessage(sender, recipient, content string, timestamp time.Time) error {
-	return s.db.Create(&Message{
+	return s.DB.Create(&Message{
 		Sender:    sender,
 		Recipient: recipient,
 		Content:   content,
@@ -52,7 +52,7 @@ func (s *Storage) SaveMessage(sender, recipient, content string, timestamp time.
 
 func (s *Storage) GetLastMessages(user string, limit int) ([]Message, error) {
 	var msgs []Message
-	err := s.db.Where("sender = ? OR recipient = ?", user, user).
+	err := s.DB.Where("sender = ? OR recipient = ?", user, user).
 		Order("timestamp desc").
 		Limit(limit).
 		Find(&msgs).Error
