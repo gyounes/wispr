@@ -2,12 +2,39 @@ package server
 
 import (
 	"context"
+	"log"
+	"os"
 	"testing"
 
 	"github.com/gyounes/wispr/backend/storage"
 )
 
+var testStore *storage.Storage
+
+// TestMain sets up the Postgres test DB
+func TestMain(m *testing.M) {
+	// Connect to Postgres test DB
+	testStore = storage.NewStorage("postgres", "secret", "wispr_test", "localhost", 5432)
+
+	// Ensure tables exist
+	if err := testStore.DB.AutoMigrate(&storage.Message{}); err != nil {
+		log.Fatalf("AutoMigrate failed: %v", err)
+	}
+
+	// Run tests
+	code := m.Run()
+
+	os.Exit(code)
+}
+
+// Helper: clean DB before each test
+func cleanDB() {
+	testStore.DB.Exec("TRUNCATE TABLE messages RESTART IDENTITY CASCADE;")
+}
+
 func TestConnections(t *testing.T) {
+	cleanDB()
+
 	conn := NewConnections()
 	ch := make(chan *Message, 1)
 	conn.Add("Alice", ch)
@@ -23,12 +50,11 @@ func TestConnections(t *testing.T) {
 }
 
 func TestSendAndReceiveMessageWithDB(t *testing.T) {
-	// in-memory DB
-	db := storage.New(":memory:")
+	cleanDB()
 
 	s := NewServer()
-	s.Connections.Storage = db
-	s.Storage = db
+	s.Connections.Storage = testStore
+	s.Storage = testStore
 
 	ch := make(chan *Message, 1)
 	s.Connections.Add("Bob", ch)
@@ -53,7 +79,7 @@ func TestSendAndReceiveMessageWithDB(t *testing.T) {
 	}
 
 	// Check DB persistence
-	msgs, err := db.GetLastMessages("Bob", 10)
+	msgs, err := testStore.GetLastMessages("Bob", 10)
 	if err != nil {
 		t.Fatalf("DB GetLastMessages failed: %v", err)
 	}
