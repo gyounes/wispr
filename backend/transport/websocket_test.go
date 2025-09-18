@@ -23,14 +23,15 @@ func dialWS(tsURL, username string, t *testing.T) *websocket.Conn {
 	return c
 }
 
-func TestWebSocketBroadcastWithDB(t *testing.T) {
-	// in-memory DB
-	db := storage.New(":memory:")
+// Helper: clean DB
+func cleanDB(db *storage.Storage) {
+	db.DB.Exec("TRUNCATE TABLE messages RESTART IDENTITY CASCADE;")
+}
 
-	// Ensure schema is ready before starting server
-	if err := db.DB.AutoMigrate(&storage.Message{}); err != nil {
-		t.Fatalf("DB migration failed: %v", err)
-	}
+func TestWebSocketBroadcastWithDB(t *testing.T) {
+	// Connect to Postgres test DB
+	db := storage.NewStorage("postgres", "secret", "wispr_test", "localhost", 5432)
+	cleanDB(db)
 
 	connections := server.NewConnections()
 	connections.Storage = db
@@ -46,7 +47,6 @@ func TestWebSocketBroadcastWithDB(t *testing.T) {
 	bob := dialWS(ts.URL, "Bob", t)
 	defer bob.Close()
 
-	// Give channels a moment to register
 	time.Sleep(50 * time.Millisecond)
 
 	// Alice sends message to Bob
