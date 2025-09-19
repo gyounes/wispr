@@ -21,7 +21,7 @@ type Message struct {
 	Timestamp time.Time
 }
 
-// NewStorage initializes a Postgres-backed DB
+// NewStorage initializes a Postgres-backed DB connection.
 func NewStorage(user, password, dbname, host string, port int) *Storage {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%d sslmode=disable TimeZone=UTC",
@@ -30,12 +30,12 @@ func NewStorage(user, password, dbname, host string, port int) *Storage {
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("failed to connect database: %v", err)
+		log.Fatalf("❌ failed to connect database: %v", err)
 	}
 
 	// AutoMigrate creates the messages table if it doesn’t exist
 	if err := db.AutoMigrate(&Message{}); err != nil {
-		log.Fatalf("failed to migrate: %v", err)
+		log.Fatalf("❌ failed to migrate: %v", err)
 	}
 
 	return &Storage{DB: db}
@@ -52,7 +52,8 @@ func (s *Storage) SaveMessage(sender, recipient, content string, timestamp time.
 
 func (s *Storage) GetLastMessages(user string, limit int) ([]Message, error) {
 	var msgs []Message
-	err := s.DB.Where("sender = ? OR recipient = ?", user, user).
+	err := s.DB.
+		Where("sender = ? OR recipient = ?", user, user).
 		Order("timestamp desc").
 		Limit(limit).
 		Find(&msgs).Error
